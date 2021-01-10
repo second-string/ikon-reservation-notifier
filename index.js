@@ -1,3 +1,5 @@
+const express = require("express");
+const http = require("http");
 const got = require("got");
 const fs = require("fs");
 const { promisify } = require("util");
@@ -6,9 +8,18 @@ const { load_puppeteer_page, get_page_token, build_cookie_str } = require("./pup
 const { build_resort_list_str, prompt_user_and_wait } = require("./cli");
 const { ikon_login, get_ikon_reservation_dates, get_ikon_resorts } = require("./ikon_proxy");
 
+if (!process.env.DEPLOY_STAGE || process.env.DEPLOY_STAGE === '') {
+    console.log("Need to source setup_env.sh to set env variables. Make sure server is started with start script not manually");
+    process.exit(1);
+}
+
 // Bind async write to fs.write
 const appendFile = promisify(fs.appendFile);
 const data_filename = "./reservation_polling_data.txt";
+
+const app = express();
+
+app.get("/health", (req, res) => res.send("Surviving not thriving"));
 
 async function main() {
     // Pull opaquely-generated (on a per-visit basis) csrf token by using puppeteer to make any request from an existing page.
@@ -114,12 +125,16 @@ async function main() {
     }
 }
 
-main()
-	.catch(e => {
-		console.error("Uncaught exception when running main()");
-		console.error(e);
-		process.exit(1);
-	});
+const httpServer = http.createServer(app);
+httpServer.listen(9090);
+console.log(`Started HTTP server listening at 9090`);
+
+// main()
+// 	.catch(e => {
+// 		console.error("Uncaught exception when running main()");
+// 		console.error(e);
+// 		process.exit(1);
+// 	});
 
 
 // todo :: get user id from /me call and use that to only show rezzy info from data array returned from resort-specific rezzy request

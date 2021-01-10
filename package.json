@@ -11,7 +11,9 @@
   "dependencies": {
     "@sendgrid/mail": "^7.4.1",
     "chrome-remote-interface": "^0.28.2",
+    "express": "^4.17.1",
     "got": "^11.8.1",
+    "http": "^0.0.1-security",
     "puppeteer": "^5.5.0",
     "tough-cookie": "^4.0.0"
   }
