@@ -1,0 +1,18 @@
+{
+  "name": "ikon-reservation-polling",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "second.string",
+  "license": "MIT",
+  "dependencies": {
+    "@sendgrid/mail": "^7.4.1",
+    "chrome-remote-interface": "^0.28.2",
+    "got": "^11.8.1",
+    "puppeteer": "^5.5.0",
+    "tough-cookie": "^4.0.0"
+  }
+}
