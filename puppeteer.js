@@ -2,7 +2,14 @@ const chrome = require("chrome-remote-interface");
 const puppeteer = require("puppeteer");
 
 async function load_puppeteer_page(url) {
-    const browser = await puppeteer.launch();
+    let opts = undefined;
+    if (process.env.DEV_ENV == "PROD") {
+        opts = {
+            executablePath: "chromium-browser"
+        };
+    }
+
+    const browser = await puppeteer.launch(opts);
     const page = await browser.newPage();
     await page.goto(url);
 
