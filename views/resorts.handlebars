@@ -1,0 +1,27 @@
+<h1>Ikon Reservation Notifications</h1>
+<p>Select a resort:</p>
+<form action="/reservation-dates" method="GET">
+    <select name="resort">
+        <option value="" disabled selected>Select a resort</option>
+        {{#each available_resorts}}
+        <option id="{{this.id}}" value="{{this.id}}">{{this.name}}</option>
+        {{/each}}
+    </select>
+    <input type="submit" />
+</form>
+<a href="#" id="unlisted-resorts-link" onclick="toggleMissingResortInfo();return false;">Why isn't the Ikon resort I want listed?</a>
+<div id="unlisted-resorts" style="display: none;">
+    <p>Because they suck</p>
+</div>
+
+<script>
+function toggleMissingResortInfo() {
+    var info = document.getElementById("unlisted-resorts");
+    console.log(info.style.display);
+    if (info.style.display == "none") {
+        info.style.display = "block";
+    } else {
+        info.style.display = "none";
+    }
+}
+</script>

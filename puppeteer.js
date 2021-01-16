@@ -11,6 +11,10 @@ async function load_puppeteer_page(url) {
 
     const browser = await puppeteer.launch(opts);
     const page = await browser.newPage();
+
+    if (process.env.DEV_ENV != "PROD") {
+        await page.setDefaultNavigationTimeout(0); 
+    }
     await page.goto(url);
 
     return {

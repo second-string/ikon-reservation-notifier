@@ -1,0 +1,7 @@
+<h1>Ikon Reservation Notifications</h1>
+<p>Select a date to monitor for open reservations at {{resort.name}}:</p>
+<form action="/save-notification" method="POST">
+    <input type="date" id="reservation-date" name="reservation-date" />
+    <input type="hidden" id="resort-id" name="resort-id" value="{{resort.id}}" />
+    <input type="submit" />
+</form>

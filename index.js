@@ -19,6 +19,13 @@ if (!process.env.DEPLOY_STAGE || process.env.DEPLOY_STAGE === '') {
 const appendFile = promisify(fs.appendFile);
 const data_filename = "./reservation_polling_data.txt";
 
+// Globals (for now at least)
+let browser;
+let page;
+let token;
+let global_cookie_jar;
+let resorts = [];
+
 const app = express();
 app.engine("handlebars", handlebars());
 app.set("view engine", "handlebars");
@@ -32,9 +39,21 @@ app.get("/", (req, res) => {
 });
 
 
-const resorts = [{id: 1, name: "test"}, {id: 2, name: "test2"}];
 app.get("/resorts", (req, res) => {
-    res.render("resorts", { resorts });
+    // Split the resorts up by ikon reservations, resort-specific site reservations, and no reservations required
+    let available_resorts = [];
+    let non_available_resorts = [];
+    let non_reservation_resorts = [];
+    for (const resort of resorts) {
+        if (resort.reservations_enabled) {
+            available_resorts.push(resort);
+        } else if (resort.reservation_system_url != ""){
+            non_available_resorts.push(resort);
+        } else {
+            non_reservation_resorts.push(resort);
+        }
+    }
+    res.render("resorts", { available_resorts, non_available_resorts, non_reservation_resorts });
 });
 
 app.get("/reservation-dates", (req, res) => {
@@ -49,7 +68,7 @@ app.get("/reservation-dates", (req, res) => {
     res.render("reservation-dates", { resort });
 });
 
-app.post("/save-notification", (req, res) => {
+app.post("/save-notification", async (req, res) => {
     if (!req.body) {
         return res.status(400).send("Incorrect parameters received.");
     }
@@ -60,85 +79,17 @@ app.post("/save-notification", (req, res) => {
         res.status(400).send("Incorrect parameters received.");
     }
 
-    res.send(`Saved noti for ${resort_id_str} on ${reservation_date_str}`);
-});
+    const resort_id = parseInt(resort_id_str);
 
-async function main() {
-    // Pull opaquely-generated (on a per-visit basis) csrf token by using puppeteer to make any request from an existing page.
-    // We don't care about the response success, just the sent token and returned cookies
-    const { browser, page } = await load_puppeteer_page("https://account.ikonpass.com/en/login");
-    const cookies = await page.cookies();
-    const token = await get_page_token(page, browser);
-    const cookie_str = build_cookie_str(cookies);
-    console.log("Successfully got token and cookies");
-
-    // Use cookie string and csrf token plus account data to log in and get authed cookies. Use cookie jar for all requests from now on
-    let { error, error_message, data, cookie_jar: cookieJar } = await ikon_login(token, cookie_str);
-    if (error) {
-        console.error("Error in POST to log in w/ token and cookies");
-        console.error(error.message);
+    // todo :: validate this better
+    const simple_date_regex = /^[0-9]{4}[\/,-][0-9]{2}[\/,-][0-9]{2}$/;
+    if (!simple_date_regex.test(reservation_date_str)) {
+        res.status(400).send("Invalid date format, please go back and try again. If entering a date manually instead of using a browser-specific datepicker, please format as YYYY-MM-dd.");
         return;
     }
-
-    // Test our logged-in cookies to make sure we have acces to the api now
-    try {
-        const res = await got("https://account.ikonpass.com/api/v2/me", { cookieJar });
-    } catch (err) {
-        console.error("Ikon login failed, did you source setup_env.sh?");
-        console.error(err);
-        return;
-    }
-
-    ({ error, error_message, data } = await get_ikon_resorts(token, cookieJar));
-    if (error) {
-        console.error("GET ikon resorts failed.");
-        console.error(error_message);
-        return;
-    }
-
-    // Add in our custom indexin to disply a nicely-numbered list to the user
-    let i = 1;
-    for (const resort of data) {
-        // We only want to assign indices to resorts available for monitoring
-        if (resort.reservations_enabled)
-        {
-            resort.custom_index = i;
-            i++;
-        }
-    }
-
-    // Validate user resort choice
-    const prompt = build_resort_list_str(data);
-    let val = -1;
-    const success_criteria = (response) => !isNaN(response) && response >= 1 && response <= i - 1;
-    while (val < 1) {
-        try {
-            val = await prompt_user_and_wait(prompt, success_criteria);
-        } catch (err) {
-            console.error("Invalid choice, please enter the number corresponding to your chosen resort.");
-            val = -1;
-        }
-    }
-
-    const chosen_resort = data.find(x => x.custom_index == val);
-    console.log(`Chosen resort: ${chosen_resort.name}\n`);
-
-    // Validate user date choice (roughly)
-    const simple_date_regex = /^[0-9]{2}\/[0-9]{2}\/[0-9]{2,4}$/
-    val = -1;
-    while (val < 0) {
-        try {
-            val = await prompt_user_and_wait("Enter the date (MM/dd/yy) that you would like to monitor for reservations:\n\nDate: ", (x) => simple_date_regex.test(x));
-        } catch (err) {
-            console.error("Invalid date");
-            val = -1;
-        }
-    }
-
-    console.log(`Chosen date: ${val}\n`);
 
     // Get ikon reservation data for this specific resort
-    let reservation_info = await get_ikon_reservation_dates(chosen_resort.id, token, cookieJar);
+    let reservation_info = await get_ikon_reservation_dates(resort_id, token, global_cookie_jar);
 
     // Dates need to be zeroed out otherwise comparison fails
     const closed_dates = reservation_info.data[0].closed_dates.map(x => {
@@ -152,31 +103,80 @@ async function main() {
         return d;
     });
 
-    let chosen_date = new Date(val);
+    let chosen_date = new Date(reservation_date_str);
     chosen_date.setHours(0, 0, 0, 0);
 
-    // email, resort id, reservation date, current date
-    const polling_data = `${process.env.IKON_USERNAME},${chosen_resort.id},${chosen_date.getTime()},${Date.now()}\n`;
-    await appendFile(data_filename, polling_data);
+    let response_str;
     if (closed_dates.find(x => x.getTime() == chosen_date.getTime())) {
-        console.log("Resort is closed on that date.");
+        response_str = "Resort is closed on that date, reservations will never be available. Notification not saved.";
     } else if (unavailable_dates.find(x => x.getTime() == chosen_date.getTime())) {
-        console.log("Reservations full, setting check");
+        try {
+            // email, resort id, reservation date, current date
+            const polling_data = `${process.env.IKON_USERNAME},${resort_id},${chosen_date.getTime()},${Date.now()}\n`;
+            await appendFile(data_filename, polling_data);
+            response_str = "Reservations are full for your selected date, notification has been saved and you will be notified if a slot opens up. Check email for confirmation.";
+        } catch (err) {
+            response_str = "Reservations are full for your selected date, but there was an internal issue saving your notification preferences. Please try again, or if the problem persists contact me."
+            console.err("Error saving to reservation file: ");
+            console.err(err);
+        }
     } else {
-        console.log("Reservations available for that date, go to ikonpass.com to reserve.");
+        response_str = "Reservations available for that date, go to ikonpass.com to reserve. Notification not saved.";
     }
+
+    res.render("notification-status", { status_message: response_str });
+});
+
+async function main() {
+    ({ browser, page } = await load_puppeteer_page("https://account.ikonpass.com/en/login"));
+    const cookies = await page.cookies();
+    token = await get_page_token(page, browser);
+    const cookie_str = build_cookie_str(cookies);
+    console.log("Successfully got token and cookies");
+
+    // Use cookie string and csrf token plus account data to log in and get authed cookies. Use cookie jar for all requests from now on
+    let { error, error_message, data, cookie_jar } = await ikon_login(token, cookie_str);
+    if (error) {
+        console.error("Error in POST to log in w/ token and cookies");
+        console.error(error.message);
+        return;
+    }
+
+    global_cookie_jar = cookie_jar;
+
+    // Test our logged-in cookies to make sure we have acces to the api now
+    try {
+        const res = await got("https://account.ikonpass.com/api/v2/me", { cookieJar: cookie_jar });
+
+    } catch (err) {
+        console.error("Ikon login failed, did you source setup_env.sh?");
+        console.error(err);
+        return;
+    }
+
+    console.log("Initial Ikon API established");
+    ({ error, error_message, data } = await get_ikon_resorts(token, cookie_jar));
+    if (error) {
+        console.error("GET ikon resorts failed.");
+        console.error(error_message);
+        return;
+    }
+
+    resorts = data;
+    console.log("Successfully retrieved and parsed Ikon resorts");
+
+    const httpServer = http.createServer(app);
+    httpServer.listen(9090);
+    console.log();
+    console.log(`Started HTTP server listening at 9090`);
 }
 
-const httpServer = http.createServer(app);
-httpServer.listen(9090);
-console.log(`Started HTTP server listening at 9090`);
-
-// main()
-// 	.catch(e => {
-// 		console.error("Uncaught exception when running main()");
-// 		console.error(e);
-// 		process.exit(1);
-// 	});
+main()
+	.catch(e => {
+		console.error("Uncaught exception when running main()");
+		console.error(e);
+		process.exit(1);
+	});
 
 
 // todo :: get user id from /me call and use that to only show rezzy info from data array returned from resort-specific rezzy request
