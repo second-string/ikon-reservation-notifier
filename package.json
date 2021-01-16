@@ -10,8 +10,10 @@
   "license": "MIT",
   "dependencies": {
     "@sendgrid/mail": "^7.4.1",
+    "body-parser": "^1.19.0",
     "chrome-remote-interface": "^0.28.2",
     "express": "^4.17.1",
+    "express-handlebars": "^5.2.0",
     "got": "^11.8.1",
     "http": "^0.0.1-security",
     "puppeteer": "^5.5.0",

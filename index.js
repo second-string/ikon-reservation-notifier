@@ -1,5 +1,7 @@
 const express = require("express");
 const http = require("http");
+const handlebars = require("express-handlebars");
+const bodyParser = require("body-parser");
 const got = require("got");
 const fs = require("fs");
 const { promisify } = require("util");
@@ -18,8 +20,48 @@ const appendFile = promisify(fs.appendFile);
 const data_filename = "./reservation_polling_data.txt";
 
 const app = express();
+app.engine("handlebars", handlebars());
+app.set("view engine", "handlebars");
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json());
 
 app.get("/health", (req, res) => res.send("Surviving not thriving"));
+
+app.get("/", (req, res) => {
+    res.render("home");
+});
+
+
+const resorts = [{id: 1, name: "test"}, {id: 2, name: "test2"}];
+app.get("/resorts", (req, res) => {
+    res.render("resorts", { resorts });
+});
+
+app.get("/reservation-dates", (req, res) => {
+    const resort_id_str = req.query.resort;
+    if (!resort_id_str) {
+        return res.status(400).send("You need to choose a resort first.");
+    }
+
+    const resort_id = parseInt(resort_id_str);
+
+    const resort = resorts.filter(x => x.id == resort_id)[0];
+    res.render("reservation-dates", { resort });
+});
+
+app.post("/save-notification", (req, res) => {
+    if (!req.body) {
+        return res.status(400).send("Incorrect parameters received.");
+    }
+
+    const resort_id_str = req.body["resort-id"];
+    const reservation_date_str = req.body["reservation-date"];
+    if (!resort_id_str || !reservation_date_str) {
+        res.status(400).send("Incorrect parameters received.");
+    }
+
+    res.send(`Saved noti for ${resort_id_str} on ${reservation_date_str}`);
+});
 
 async function main() {
     // Pull opaquely-generated (on a per-visit basis) csrf token by using puppeteer to make any request from an existing page.
