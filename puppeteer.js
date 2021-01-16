@@ -3,7 +3,8 @@ const puppeteer = require("puppeteer");
 
 async function load_puppeteer_page(url) {
     let opts = undefined;
-    if (process.env.DEV_ENV == "PROD") {
+    if (process.env.DEPLOY_STAGE == "PROD") {
+        console.log("Specifying executable path for chromium...");
         opts = {
             executablePath: "chromium-browser"
         };
