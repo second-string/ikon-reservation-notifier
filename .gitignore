@@ -8,6 +8,9 @@ setup_env.sh
 # our 'database' and it's backup
 reservation_polling_data.txt*
 
+# our server start script
+start_ikon_reservation_notifier.sh
+
 # Logs
 logs
 *.log
