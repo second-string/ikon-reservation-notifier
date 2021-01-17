@@ -11,6 +11,9 @@ reservation_polling_data.txt*
 # our server start script
 start_ikon_reservation_notifier.sh
 
+# self-signed certs for localhost ssl
+*.pem
+
 # Logs
 logs
 *.log

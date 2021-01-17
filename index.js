@@ -1,5 +1,6 @@
 const express = require("express");
 const http = require("http");
+const https = require("https");
 const handlebars = require("express-handlebars");
 const bodyParser = require("body-parser");
 const got = require("got");
@@ -165,10 +166,25 @@ async function main() {
     resorts = data;
     console.log("Successfully retrieved and parsed Ikon resorts");
 
-    const httpServer = http.createServer(app);
-    httpServer.listen(9090);
+    let port;
+    if (process.env.DEPLOY_STAGE == "DEV") {
+        console.log("Setting up https with self-signed local certs for dev env");
+        port = 443;
+        var key = fs.readFileSync(__dirname + '/self-signed-ikon-reservations-key.pem');
+        var cert = fs.readFileSync(__dirname + '/self-signed-ikon-reservations-cert.pem');
+        var creds = {
+            key: key,
+            cert: cert
+        };
+    } else {
+        console.log("Setting up https with letsencrypt certs for prod env");
+        port = 6443;
+    }
+
+    const httpsServer = https.createServer(creds, app);
+    httpsServer.listen(port);
     console.log();
-    console.log(`Started HTTP server listening at 9090`);
+    console.log(`Started HTTPS server listening at ${port}`);
 }
 
 main()
