@@ -177,8 +177,22 @@ async function main() {
             cert: cert
         };
     } else {
+        if (!process.env.PROD_SSL_KEY_PATH || !process.env.PROD_SSL_CERT_PATH || !process.env.PROD_SSL_CA_CERT_PATH) {
+            console.log("SSL cert env variables not set. Source the setup_env.sh script");
+            process.exit(1);
+        }
+
         console.log("Setting up https with letsencrypt certs for prod env");
         port = 6443;
+
+        const key = fs.readFileSync(process.env.PROD_SSL_KEY_PATH);
+        const cert = fs.readFileSync(process.env.PROD_SSL_CERT_PATH);
+        const ca = fs.readFileSync(process.env.PROD_SSL_CA_CERT_PATH);
+        creds = {
+            key,
+            cert,
+            ca
+        };
     }
 
     const httpsServer = https.createServer(creds, app);
