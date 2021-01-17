@@ -113,13 +113,15 @@ app.post("/save-notification", async (req, res) => {
     } else if (unavailable_dates.find(x => x.getTime() == chosen_date.getTime())) {
         try {
             // email, resort id, reservation date, current date
-            const polling_data = `${process.env.IKON_USERNAME},${resort_id},${chosen_date.getTime()},${Date.now()}\n`;
+            const email = process.env.IKON_USERNAME;
+            const polling_data = `\n${email},${resort_id},${chosen_date.getTime()},${Date.now()}`;
             await appendFile(data_filename, polling_data);
             response_str = "Reservations are full for your selected date, notification has been saved and you will be notified if a slot opens up. Check email for confirmation.";
+            console.log(`Saved notification for ${email}`);
         } catch (err) {
             response_str = "Reservations are full for your selected date, but there was an internal issue saving your notification preferences. Please try again, or if the problem persists contact me."
-            console.err("Error saving to reservation file: ");
-            console.err(err);
+            console.error("Error saving to reservation file: ");
+            console.error(err);
         }
     } else {
         response_str = "Reservations available for that date, go to ikonpass.com to reserve. Notification not saved.";
@@ -148,7 +150,6 @@ async function main() {
     // Test our logged-in cookies to make sure we have acces to the api now
     try {
         const res = await got("https://account.ikonpass.com/api/v2/me", { cookieJar: cookie_jar, ignoreInvalidCookies: true });
-
     } catch (err) {
         console.error("Ikon login failed, did you source setup_env.sh?");
         console.error(err);

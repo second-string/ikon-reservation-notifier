@@ -50,6 +50,10 @@ async function main() {
     });
 
     for await (const line of rl) {
+        if (line.trim() == "") {
+            continue;
+        }
+
         lineData = line.split(",");
 
         // email, resort id, reservation date, current date
@@ -80,7 +84,7 @@ async function main() {
             console.log("Resort is closed on that date.");
             new_file.write(line);
         } else if (unavailable_dates.find(x => x.getTime() == chosen_date.getTime())) {
-            console.log("Reservations full, setting check");
+            console.log("Reservations still full");
             new_file.write(line);
         } else {
             const end_of_date = chosen_date.toISOString().indexOf('T');
