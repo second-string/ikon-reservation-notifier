@@ -34,7 +34,7 @@ async function main() {
 
     // Test our logged-in cookies to make sure we have acces to the api now
     try {
-        const res = await got("https://account.ikonpass.com/api/v2/me", { cookieJar: cookie_jar });
+        const res = await got("https://account.ikonpass.com/api/v2/me", { cookieJar: cookie_jar, ignoreInvalidCookies: true });
     } catch (err) {
         console.error("Ikon login failed, did you source setup_env.sh?");
         console.error(err);
@@ -74,9 +74,7 @@ async function main() {
         });
 
         let chosen_date = new Date(desiredDate);
-            console.log(chosen_date);
         chosen_date.setHours(0, 0, 0, 0);
-            console.log(chosen_date.toString());
 
         if (closed_dates.find(x => x.getTime() == chosen_date.getTime())) {
             console.log("Resort is closed on that date.");
@@ -85,7 +83,6 @@ async function main() {
             console.log("Reservations full, setting check");
             new_file.write(line);
         } else {
-            console.log(chosen_date.toString());
             const end_of_date = chosen_date.toISOString().indexOf('T');
             const pretty_date = chosen_date.toISOString().substr(0, end_of_date);
 
@@ -98,6 +95,7 @@ async function main() {
 
             try {
                 await sendgrid.send(msg);
+                console.log(`Sent email to ${email} for ${resortId}`);
             } catch (e) {
                 console.error("Error sending mail;");
                 console.error(e);
