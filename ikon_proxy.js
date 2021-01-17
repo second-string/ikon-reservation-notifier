@@ -16,6 +16,9 @@ async function ikon_login(token, cookie_str) {
     });
 
     // Provide empty cookieJar so we save all of the logged-in cookies on response and can use that going forward
+    // ignoreInvalidCookies SUPER important, Ikon's CDN Incapsula injects malformed cookies on purpose to defeat
+    // bots / scrapers because browsers just disregard them. The NODE_OPTIONS env var must also be set to --insecure-http-parser
+    // otherwise it'll choke before it even gets to got's cookie parsing
     const cookie_jar = new CookieJar();
     const opts = {
         throwHttpErrors: false,
@@ -24,14 +27,26 @@ async function ikon_login(token, cookie_str) {
             "email": process.env.IKON_USERNAME,
             "password": process.env.IKON_PASSWORD
         },
-        cookieJar: cookie_jar
+        cookieJar: cookie_jar,
+        ignoreInvalidCookies: true
     };
 
-    const res = await token_instance("https://account.ikonpass.com/session", opts);
-    const error = !(res.statusCode >= 200 && res.statusCode <= 299);
+    let res;
+    let error;
+    let error_message = null;
+    try {
+        res = await token_instance("https://account.ikonpass.com/session", opts);
+        error = !(res.statusCode >= 200 && res.statusCode <= 299);
+    } catch (err) {
+        console.error("Error POSTing login creds");
+        console.error(err);
+        error = true;
+        error_message = "shit";
+    }
+
     return {
         error,
-        error_message: error ? res.body : null,
+        error_message: error_message, 
         data: null,
         cookie_jar
     };
@@ -48,11 +63,13 @@ async function get_ikon_reservation_dates(resort_id, token, cookie_jar) {
         }
     });
 
+    // See comment in ikon_login for reasoning behind invalid cookies
     const opts = {
         throwdHttpErrors: false,
         method: "GET",
         responseType: "json",
-        cookieJar: cookie_jar
+        cookieJar: cookie_jar,
+        ignoreInvalidCookies: true
     };
 
     const res = await token_instance(`https://account.ikonpass.com/api/v2/reservation-availability/${resort_id}`, opts);
@@ -77,11 +94,13 @@ async function get_ikon_resorts(token, cookie_jar) {
         }
     });
 
+    // See comment in ikon_login for reasoning behind invalid cookies
     const opts = {
         throwdHttpErrors: false,
         method: "GET",
         responseType: "json",
-        cookieJar: cookie_jar
+        cookieJar: cookie_jar,
+        ignoreInvalidCookies: true
     };
 
     const res = await token_instance("https://account.ikonpass.com/api/v2/resorts", opts);

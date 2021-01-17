@@ -24,7 +24,7 @@ async function main() {
     console.log("Successfully got token and cookies");
 
     // Use cookie string and csrf token plus account data to log in and get authed cookies. Use cookie jar for all requests from now on
-    let { error, error_message, data, cookie_jar: cookieJar } = await ikon_login(token, cookie_str);
+    let { error, error_message, data, cookie_jar } = await ikon_login(token, cookie_str);
     if (error) {
         console.error("Error in POST to log in w/ token and cookies");
         console.error(error.message);
@@ -34,7 +34,7 @@ async function main() {
 
     // Test our logged-in cookies to make sure we have acces to the api now
     try {
-        const res = await got("https://account.ikonpass.com/api/v2/me", { cookieJar });
+        const res = await got("https://account.ikonpass.com/api/v2/me", { cookieJar: cookie_jar });
     } catch (err) {
         console.error("Ikon login failed, did you source setup_env.sh?");
         console.error(err);
@@ -59,7 +59,7 @@ async function main() {
         const dateSaved = lineData[3];
 
         // Get ikon reservation data for this specific resort
-        let reservation_info = await get_ikon_reservation_dates(resortId, token, cookieJar);
+        let reservation_info = await get_ikon_reservation_dates(resortId, token, cookie_jar);
         
         // Dates need to be zeroed out otherwise comparison fails
         const closed_dates = reservation_info.data[0].closed_dates.map(x => {
@@ -73,7 +73,6 @@ async function main() {
             return d;
         });
 
-console.log(desiredDate);
         let chosen_date = new Date(desiredDate);
             console.log(chosen_date);
         chosen_date.setHours(0, 0, 0, 0);

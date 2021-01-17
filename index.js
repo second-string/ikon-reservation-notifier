@@ -147,7 +147,7 @@ async function main() {
 
     // Test our logged-in cookies to make sure we have acces to the api now
     try {
-        const res = await got("https://account.ikonpass.com/api/v2/me", { cookieJar: cookie_jar });
+        const res = await got("https://account.ikonpass.com/api/v2/me", { cookieJar: cookie_jar, ignoreInvalidCookies: true });
 
     } catch (err) {
         console.error("Ikon login failed, did you source setup_env.sh?");
