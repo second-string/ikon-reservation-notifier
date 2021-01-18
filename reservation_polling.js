@@ -82,10 +82,10 @@ async function main() {
 
         if (closed_dates.find(x => x.getTime() == chosen_date.getTime())) {
             console.log("Resort is closed on that date.");
-            new_file.write(line + "\n");
+            new_file.write("\n" + line);
         } else if (unavailable_dates.find(x => x.getTime() == chosen_date.getTime())) {
             console.log("Reservations still full");
-            new_file.write(line + "\n");
+            new_file.write("\n" + line);
         } else {
             const end_of_date = chosen_date.toISOString().indexOf('T');
             const pretty_date = chosen_date.toISOString().substr(0, end_of_date);
