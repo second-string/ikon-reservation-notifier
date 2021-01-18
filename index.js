@@ -7,9 +7,8 @@ const got = require("got");
 const fs = require("fs");
 const { promisify } = require("util");
 
-const { load_puppeteer_page, get_page_token, build_cookie_str } = require("./puppeteer");
 const { build_resort_list_str, prompt_user_and_wait } = require("./cli");
-const { ikon_login, get_ikon_reservation_dates, get_ikon_resorts } = require("./ikon_proxy");
+const { load_token_and_cookies, test_ikon_token_and_cookies, get_ikon_reservation_dates, get_ikon_resorts } = require("./ikon_proxy");
 
 if (!process.env.DEPLOY_STAGE || process.env.DEPLOY_STAGE === '') {
     console.log("Need to source setup_env.sh to set env variables. Make sure server is started with start script not manually");
@@ -21,10 +20,6 @@ const appendFile = promisify(fs.appendFile);
 const data_filename = "./reservation_polling_data.txt";
 
 // Globals (for now at least)
-let browser;
-let page;
-let token;
-let global_cookie_jar;
 let resorts = [];
 
 const app = express();
@@ -91,7 +86,7 @@ app.post("/save-notification", async (req, res) => {
     }
 
     // Get ikon reservation data for this specific resort
-    let reservation_info = await get_ikon_reservation_dates(resort_id, token, global_cookie_jar);
+    let reservation_info = await get_ikon_reservation_dates(resort_id);
 
     // Dates need to be zeroed out otherwise comparison fails
     const closed_dates = reservation_info.data[0].closed_dates.map(x => {
@@ -131,33 +126,22 @@ app.post("/save-notification", async (req, res) => {
 });
 
 async function main() {
-    ({ browser, page } = await load_puppeteer_page("https://account.ikonpass.com/en/login"));
-    const cookies = await page.cookies();
-    token = await get_page_token(page, browser);
-    const cookie_str = build_cookie_str(cookies);
-    console.log("Successfully got token and cookies");
-
-    // Use cookie string and csrf token plus account data to log in and get authed cookies. Use cookie jar for all requests from now on
-    let { error, error_message, data, cookie_jar } = await ikon_login(token, cookie_str);
+    let { error, error_message, data } = await load_token_and_cookies();
     if (error) {
-        console.error("Error in POST to log in w/ token and cookies");
-        console.error(error.message);
+        console.error(error_message);
         return;
     }
 
-    global_cookie_jar = cookie_jar;
-
     // Test our logged-in cookies to make sure we have acces to the api now
-    try {
-        const res = await got("https://account.ikonpass.com/api/v2/me", { cookieJar: cookie_jar, ignoreInvalidCookies: true });
-    } catch (err) {
-        console.error("Ikon login failed, did you source setup_env.sh?");
-        console.error(err);
+    const success = await test_ikon_token_and_cookies();
+    if (!success)
+    {
+        console.error("Failed validating received cookies and token on /me endpoint");
         return;
     }
 
     console.log("Initial Ikon API established");
-    ({ error, error_message, data } = await get_ikon_resorts(token, cookie_jar));
+    ({ error, error_message, data } = await get_ikon_resorts());
     if (error) {
         console.error("GET ikon resorts failed.");
         console.error(error_message);
