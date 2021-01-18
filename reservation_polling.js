@@ -112,6 +112,7 @@ async function main() {
     // Move our new file without any available reservations over the old one to overwrite
     fs.renameSync(dataFilename, dataFilename + ".bkp");
     fs.renameSync(newDataFilename, dataFilename);
+    console.log("Moving old file to .bkp and renaming new file to be normal filename");
 }
 
 main()
