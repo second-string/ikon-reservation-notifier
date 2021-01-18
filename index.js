@@ -76,7 +76,8 @@ app.post("/save-notification", async (req, res) => {
 
     const resort_id_str = req.body["resort-id"];
     const reservation_date_str = req.body["reservation-date"];
-    if (!resort_id_str || !reservation_date_str) {
+    const email = req.body["email"];
+    if (!resort_id_str || !reservation_date_str || !email) {
         res.status(400).send("Incorrect parameters received.");
     }
 
@@ -113,7 +114,6 @@ app.post("/save-notification", async (req, res) => {
     } else if (unavailable_dates.find(x => x.getTime() == chosen_date.getTime())) {
         try {
             // email, resort id, reservation date, current date
-            const email = process.env.IKON_USERNAME;
             const polling_data = `\n${email},${resort_id},${chosen_date.getTime()},${Date.now()}`;
             await appendFile(data_filename, polling_data);
             response_str = "Reservations are full for your selected date, notification has been saved and you will be notified if a slot opens up. Check email for confirmation.";
