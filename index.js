@@ -9,6 +9,7 @@ const { promisify } = require("util");
 
 const { build_resort_list_str, prompt_user_and_wait } = require("./cli");
 const { load_token_and_cookies, test_ikon_token_and_cookies, get_ikon_reservation_dates, get_ikon_resorts } = require("./ikon_proxy");
+const { sendgrid_send_message } = require("./sendgrid_proxy.js");
 
 if (!process.env.DEPLOY_STAGE || process.env.DEPLOY_STAGE === '') {
     console.log("Need to source setup_env.sh to set env variables. Make sure server is started with start script not manually");
@@ -109,10 +110,12 @@ app.post("/save-notification", async (req, res) => {
     } else if (unavailable_dates.find(x => x.getTime() == chosen_date.getTime())) {
         try {
             // email, resort id, reservation date, current date
-            const polling_data = `\n${email},${resort_id},${chosen_date.getTime()},${Date.now()}`;
+            const now = Date.now();
+            const polling_data = `\n${email},${resort_id},${chosen_date.getTime()},${now}`;
             await appendFile(data_filename, polling_data);
             response_str = "Reservations are full for your selected date, notification has been saved and you will be notified if a slot opens up. Check email for confirmation.";
             console.log(`Saved notification for ${email}`);
+            await send_confirmation_email(email, resort_id, chosen_date, now);
         } catch (err) {
             response_str = "Reservations are full for your selected date, but there was an internal issue saving your notification preferences. Please try again, or if the problem persists contact me."
             console.error("Error saving to reservation file: ");
@@ -124,6 +127,26 @@ app.post("/save-notification", async (req, res) => {
 
     res.render("notification-status", { status_message: response_str });
 });
+
+async function send_confirmation_email(email, resort_id, chosen_date, now) {
+    const end_of_date = chosen_date.toISOString().indexOf('T');
+    const pretty_date = chosen_date.toISOString().substr(0, end_of_date);
+    const resort = resorts.find(x => x.id == resort_id);
+
+    const msg = {
+        to: email,
+        from: "ikonreservationnotifier@brianteam.dev",
+        subject: "Confirmation of Ikon reservation notification",
+        text: `Notification saved for ${resort == undefined ? resortIdStr : resort.name} on ${pretty_date}. You'll receive an email at this address if a reservation slot opens up before that date, no more action is needed.`
+    };
+
+    const email_success = await sendgrid_send_message(msg);
+    if (email_success) {
+        console.log(`Sent confirmation email to ${email} for ${resort == undefined ? resortIdStr : resort.name} on ${chosen_date.toISOString()}`);
+    } else {
+        console.error(`Error sending confirmation email to ${email} for ${resort == undefined ? resortIdStr : resort.name} for ${chosen_date.toISOString()}!`);
+    }
+}
 
 async function main() {
     let { error, error_message, data } = await load_token_and_cookies();

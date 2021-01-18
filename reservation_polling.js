@@ -1,15 +1,14 @@
 const fs = require("fs");
 const readline = require("readline");
 const got = require("got");
-const sendgrid = require("@sendgrid/mail");
+
+const { sendgrid_send_message } = require("./sendgrid_proxy.js");
 
 const dataFilename = process.env.DEPLOY_STAGE ==  "PROD" ? "/home/pi/ikon-reservation-notifier/reservation_polling_data.txt" : "./reservation_polling_data.txt";
 const newDataFilename = process.env.DEPLOY_STAGE ==  "PROD" ? "/home/pi/ikon-reservation-notifier/new_reservation_polling_data.txt" :  "./new_reservation_polling_data.txt";
 
 const { load_puppeteer_page, get_page_token, build_cookie_str } = require("./puppeteer");
 const { load_token_and_cookies, test_ikon_token_and_cookies, get_ikon_resorts, get_ikon_reservation_dates } = require("./ikon_proxy");
-
-sendgrid.setApiKey(process.env.SG_IKON_RESERVATION_KEY);
 
 async function main() {
     const file = fs.createReadStream(dataFilename);
@@ -97,12 +96,11 @@ async function main() {
                 text: `The resort you have been monitoring for open reservations, ${resort == undefined ? resortIdStr : resort.name}, now has open spots for ${pretty_date}. This date notification will now be cleared, if you would like to set another one please visit ikonreservations.brianteam.dev again`
             };
 
-            try {
-                await sendgrid.send(msg);
-                console.log(`Sent email to ${email} for ${resort.name} on ${chosen_date.toISOString()}`);
-            } catch (e) {
-                console.error("Error sending mail;");
-                console.error(e);
+            const email_success = sendgrid_send_message(msg);
+            if (email_success) {
+                console.log(`Sent email to ${email} for ${resort == undefined ? resortIdStr : resort.name} on ${chosen_date.toISOString()}`);
+            } else {
+                console.error(`Error sending notification email to ${email} for ${resort == undefined ? resortIdStr : resort.name} for ${chosen_date.toISOString()}!`);
             }
         }
     }
