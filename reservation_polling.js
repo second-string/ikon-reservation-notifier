@@ -3,8 +3,8 @@ const readline = require("readline");
 const got = require("got");
 const sendgrid = require("@sendgrid/mail");
 
-const dataFilename = "./reservation_polling_data.txt";
-const newDataFilename = "./new_reservation_polling_data.txt";
+const dataFilename = process.env.DEPLOY_STAGE ==  "PROD" ? "/home/pi/ikon-reservation-notifier/reservation_polling_data.txt" : "./reservation_polling_data.txt";
+const newDataFilename = process.env.DEPLOY_STAGE ==  "PROD" ? "/home/pi/ikon-reservation-notifier/new_reservation_polling_data.txt" :  "./new_reservation_polling_data.txt";
 
 const { load_puppeteer_page, get_page_token, build_cookie_str } = require("./puppeteer");
 const { ikon_login, get_ikon_reservation_dates } = require("./ikon_proxy");
