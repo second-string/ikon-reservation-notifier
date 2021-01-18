@@ -9,9 +9,28 @@
     </select>
     <input type="submit" />
 </form>
-<a href="#" id="unlisted-resorts-link" onclick="toggleMissingResortInfo();return false;">Why isn't the Ikon resort I want listed?</a>
+<a href="#" id="unlisted-resorts-link" onclick="toggleMissingResortInfo();return false;" style="margin-top: 1em;"><small>Why isn't the Ikon resort I want listed?</small></a>
 <div id="unlisted-resorts" style="display: none;">
-    <p>Because they suck</p>
+   <p>Not all resorts make their reservations through Ikon's website - some host their own system which is inaccessible.</p> 
+   <p>Some resorts don't require reservations at all. Check below to see if that's the case for you.</p>
+   <div style="display: flex; justify-content: space-between;">
+        <div id="column-one">
+            <p>Resorts that don't require reservations:</p>
+            <ul>
+                {{#each non_reservation_resorts}}
+                <li>{{this.name}}</li>
+                {{/each}}
+            </ul>
+        </div>
+        <div id="column-two">
+            <p>Resorts that run their own reservation systems:</p>
+            <ul>
+                {{#each non_available_resorts}}
+                <li>{{this.name}}</li>
+                {{/each}}
+            </ul>
+        </div>
+   </div>
 </div>
 
 <script>
