@@ -7,7 +7,7 @@ const dataFilename = process.env.DEPLOY_STAGE ==  "PROD" ? "/home/pi/ikon-reserv
 const newDataFilename = process.env.DEPLOY_STAGE ==  "PROD" ? "/home/pi/ikon-reservation-notifier/new_reservation_polling_data.txt" :  "./new_reservation_polling_data.txt";
 
 const { load_puppeteer_page, get_page_token, build_cookie_str } = require("./puppeteer");
-const { ikon_login, get_ikon_reservation_dates } = require("./ikon_proxy");
+const { load_token_and_cookies, test_ikon_token_and_cookies, get_ikon_resorts, get_ikon_reservation_dates } = require("./ikon_proxy");
 
 sendgrid.setApiKey(process.env.SG_IKON_RESERVATION_KEY);
 
@@ -15,33 +15,31 @@ async function main() {
     const file = fs.createReadStream(dataFilename);
     const new_file = fs.createWriteStream(newDataFilename);
 
-    // Pull opaquely-generated (on a per-visit basis) csrf token by using puppeteer to make any request from an existing page.
-    // We don't care about the response success, just the sent token and returned cookies
-    const { browser, page } = await load_puppeteer_page("https://account.ikonpass.com/en/login");
-    const cookies = await page.cookies();
-    const token = await get_page_token(page, browser);
-    const cookie_str = build_cookie_str(cookies);
-    console.log("Successfully got token and cookies");
-
-    // Use cookie string and csrf token plus account data to log in and get authed cookies. Use cookie jar for all requests from now on
-    let { error, error_message, data, cookie_jar } = await ikon_login(token, cookie_str);
+    // Run browser page and cookies/token load once, then use those creds for every reservation data query
+    let { error, error_message, data } = await load_token_and_cookies();
     if (error) {
-        console.error("Error in POST to log in w/ token and cookies");
-        console.error(error.message);
+        console.error(error_message);
         return;
     }
-    console.log("Successfully logged in");
 
     // Test our logged-in cookies to make sure we have acces to the api now
-    try {
-        const res = await got("https://account.ikonpass.com/api/v2/me", { cookieJar: cookie_jar, ignoreInvalidCookies: true });
-    } catch (err) {
-        console.error("Ikon login failed, did you source setup_env.sh?");
-        console.error(err);
+    const success = await test_ikon_token_and_cookies();
+    if (!success)
+    {
+        console.error("Failed validating received cookies and token on /me endpoint");
         return;
     }
 
-    console.log("Successfully tested logged-in cookies");
+    console.log("Initial Ikon API established");
+    ({ error, error_message, data } = await get_ikon_resorts());
+    if (error) {
+        console.error("GET ikon resorts failed.");
+        console.error(error_message);
+        return;
+    }
+
+    const resorts = data;
+    console.log("Successfully retrieved and parsed Ikon resorts");
 
     let lineData = [];
     const rl = readline.createInterface({
@@ -58,12 +56,14 @@ async function main() {
 
         // email, resort id, reservation date, current date
         const email = lineData[0];
-        const resortId = lineData[1];
+        const resortIdStr = lineData[1];
         const desiredDate = parseInt(lineData[2], 10);
         const dateSaved = lineData[3];
+        const resortId = parseInt(resortIdStr);
+        const resort = resorts.find(x => x.id == resortId);
 
         // Get ikon reservation data for this specific resort
-        let reservation_info = await get_ikon_reservation_dates(resortId, token, cookie_jar);
+        let reservation_info = await get_ikon_reservation_dates(resortIdStr);
         
         // Dates need to be zeroed out otherwise comparison fails
         const closed_dates = reservation_info.data[0].closed_dates.map(x => {
@@ -81,10 +81,10 @@ async function main() {
         chosen_date.setHours(0, 0, 0, 0);
 
         if (closed_dates.find(x => x.getTime() == chosen_date.getTime())) {
-            console.log("Resort is closed on that date.");
+            console.log(`Resort is closed on ${chosen_date.toISOString()}.`);
             new_file.write("\n" + line);
         } else if (unavailable_dates.find(x => x.getTime() == chosen_date.getTime())) {
-            console.log("Reservations still full");
+            console.log(`Reservations still full on ${chosen_date.toISOString()} for resort ${resort.name}`);
             new_file.write("\n" + line);
         } else {
             const end_of_date = chosen_date.toISOString().indexOf('T');
@@ -94,12 +94,12 @@ async function main() {
                 to: email,
                 from: "ikonreservationnotifier@brianteam.dev",
                 subject: "Your chosen Ikon resort has open reservations!",
-                text: `The resort you have been monitoring for open reservations, ${resortId}, now has open spots for ${pretty_date}. This date notification will now be cleared, if you would like to set another one please visit ikonreservations.brianteam.dev again`
+                text: `The resort you have been monitoring for open reservations, ${resort == undefined ? resortIdStr : resort.name}, now has open spots for ${pretty_date}. This date notification will now be cleared, if you would like to set another one please visit ikonreservations.brianteam.dev again`
             };
 
             try {
                 await sendgrid.send(msg);
-                console.log(`Sent email to ${email} for ${resortId}`);
+                console.log(`Sent email to ${email} for ${resort.name} on ${chosen_date.toISOString()}`);
             } catch (e) {
                 console.error("Error sending mail;");
                 console.error(e);
