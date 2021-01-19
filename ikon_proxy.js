@@ -128,7 +128,7 @@ async function get_ikon_reservation_dates(resort_id) {
     }
 
     // We've most likely be deauthed, reload token/cookies and try again
-    if (res.statusCode == 401) {
+    if (res == undefined || res.statusCode == 401) {
         console.log("Attemtping to reload token/cookies in middle of notification saving due to expiration...");
         let { reload_error, reload_error_message, reload_data } = await load_token_and_cookies();
         if (reload_error) {
