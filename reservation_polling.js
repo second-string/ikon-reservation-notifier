@@ -66,18 +66,19 @@ async function main() {
         
         // Dates need to be zeroed out otherwise comparison fails
         const closed_dates = reservation_info.data[0].closed_dates.map(x => {
-            const d = new Date(x);
-            d.setHours(0, 0, 0, 0);
+            const d = new Date(x + "Z");
+            d.setUTCHours(0, 0, 0, 0);
             return d;
         });
         const unavailable_dates = reservation_info.data[0].unavailable_dates.map(x => {
-            const d = new Date(x);
-            d.setHours(0, 0, 0, 0);
+            const d = new Date(x + "Z");
+            d.setUTCHours(0, 0, 0, 0);
             return d;
         });
 
-        let chosen_date = new Date(desiredDate);
-        chosen_date.setHours(0, 0, 0, 0);
+        // It should parse it as UTC but tack onthe Z to force it for all cases
+        let chosen_date = new Date(desiredDate + "Z");
+        chosen_date.setUTCHours(0, 0, 0, 0);
 
         if (closed_dates.find(x => x.getTime() == chosen_date.getTime())) {
             console.log(`Resort is closed on ${chosen_date.toISOString()}.`);
