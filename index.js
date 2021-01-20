@@ -88,6 +88,10 @@ app.post("/save-notification", async (req, res) => {
 
     // Get ikon reservation data for this specific resort
     let reservation_info = await get_ikon_reservation_dates(resort_id);
+    if (reservation_info.error) {
+        console.error(reservation_info.error_message);
+        return res.status(500);
+    }
 
     // Dates need to be zeroed out otherwise comparison fails
     const closed_dates = reservation_info.data[0].closed_dates.map(x => {
