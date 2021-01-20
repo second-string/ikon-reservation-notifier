@@ -122,16 +122,19 @@ async function get_ikon_reservation_dates(resort_id) {
         res = await token_instance(`https://account.ikonpass.com/api/v2/reservation-availability/${resort_id}`, opts);
         data = res.body.data;
         error = !(res.statusCode >= 200 && res.statusCode <= 299);
+        console.log(`response of ${res.statusCode} but did not throw`);
     } catch (err) {
+        console.log(`Threw requesting and falling through catch block`);
         error = true;
         error_message = err.message;
     }
 
     // We've most likely be deauthed, reload token/cookies and try again
-    if (res == undefined || res.statusCode == 401) {
+    if (res == undefined || res.statusCode >= 400) {
         console.log("Attemtping to reload token/cookies in middle of notification saving due to expiration...");
         let { reload_error, reload_error_message, reload_data } = await load_token_and_cookies();
         if (reload_error) {
+            console.log(`got reload error calling load_token_and_cookies in retry block`);
             error = true;
             error_message = "Tried to reload token/cookies after 401 but that call failed:\n";
             error_message += reload_error_message;
@@ -144,8 +147,11 @@ async function get_ikon_reservation_dates(resort_id) {
             error = true;
             error_message = "Tried to reload token/cookies after 401. First reload call worked, but test call to /me failed";
         }
+    } else {
+        console.log(`error is ${error} and msg is ${error_message} but did not enter retry block`);
     }
 
+    console.log(`returning error ${error} and msg ${error_message}`);
     return {
         error,
         error_message: error ? error_message : null,
