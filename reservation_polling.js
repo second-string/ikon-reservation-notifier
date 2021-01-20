@@ -77,7 +77,7 @@ async function main() {
         });
 
         // It should parse it as UTC but tack onthe Z to force it for all cases
-        let chosen_date = new Date(desiredDate + "Z");
+        let chosen_date = new Date(desiredDate);
         chosen_date.setUTCHours(0, 0, 0, 0);
 
         if (closed_dates.find(x => x.getTime() == chosen_date.getTime())) {
