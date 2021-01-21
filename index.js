@@ -9,7 +9,7 @@ const { promisify } = require("util");
 
 const { build_resort_list_str, prompt_user_and_wait } = require("./cli");
 const { load_token_and_cookies, test_ikon_token_and_cookies, get_ikon_reservation_dates, get_ikon_resorts } = require("./ikon_proxy");
-const { sendgrid_send_message } = require("./sendgrid_proxy.js");
+const { send_confirmation_email } = require("./sendgrid_proxy.js");
 
 if (!process.env.DEPLOY_STAGE || process.env.DEPLOY_STAGE === '') {
     console.log("Need to source setup_env.sh to set env variables. Make sure server is started with start script not manually");
@@ -34,7 +34,6 @@ app.get("/health", (req, res) => res.send("Surviving not thriving"));
 app.get("/", (req, res) => {
     res.render("home");
 });
-
 
 app.get("/resorts", (req, res) => {
     // Split the resorts up by ikon reservations, resort-specific site reservations, and no reservations required
@@ -133,25 +132,16 @@ app.post("/save-notification", async (req, res) => {
     res.render("notification-status", { status_message: response_str });
 });
 
-async function send_confirmation_email(email, resort_id, chosen_date, now) {
-    const end_of_date = chosen_date.toISOString().indexOf('T');
-    const pretty_date = chosen_date.toISOString().substr(0, end_of_date);
-    const resort = resorts.find(x => x.id == resort_id);
-
-    const msg = {
-        to: email,
-        from: "ikonreservationnotifier@brianteam.dev",
-        subject: "Confirmation of Ikon reservation notification",
-        text: `Notification saved for ${resort == undefined ? resortIdStr : resort.name} on ${pretty_date}. You'll receive an email at this address if a reservation slot opens up before that date, no more action is needed.`
-    };
-
-    const email_success = await sendgrid_send_message(msg);
-    if (email_success) {
-        console.log(`Sent confirmation email to ${email} for ${resort == undefined ? resortIdStr : resort.name} on ${chosen_date.toISOString()}`);
-    } else {
-        console.error(`Error sending confirmation email to ${email} for ${resort == undefined ? resortIdStr : resort.name} for ${chosen_date.toISOString()}!`);
+app.post("/refresh-ikon-auth", async (req, res) => {
+    // Get call reservation data function with resort id to force auth refresh
+    let reservation_info = await get_ikon_reservation_dates(1);
+    if (reservation_info.error) {
+        console.error(reservation_info.error_message);
+        return res.status(500);
     }
-}
+
+    return res.status(204);
+});
 
 async function main() {
     let { error, error_message, data } = await load_token_and_cookies();
