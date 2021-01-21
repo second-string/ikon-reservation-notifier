@@ -8,24 +8,17 @@ const dataFilename = process.env.DEPLOY_STAGE ==  "PROD" ? "/home/pi/ikon-reserv
 const newDataFilename = process.env.DEPLOY_STAGE ==  "PROD" ? "/home/pi/ikon-reservation-notifier/new_reservation_polling_data.txt" :  "./new_reservation_polling_data.txt";
 
 const { load_puppeteer_page, get_page_token, build_cookie_str } = require("./puppeteer");
-const { load_token_and_cookies, test_ikon_token_and_cookies, get_ikon_resorts, get_ikon_reservation_dates } = require("./ikon_proxy");
+const { refresh_and_test_auth, get_ikon_resorts, get_ikon_reservation_dates } = require("./ikon_proxy");
 
 async function main() {
     const file = fs.createReadStream(dataFilename);
     const new_file = fs.createWriteStream(newDataFilename);
 
     // Run browser page and cookies/token load once, then use those creds for every reservation data query
-    let { error, error_message, data } = await load_token_and_cookies();
+    let { error, error_message, data } = await refresh_and_test_auth();
     if (error) {
+        console.error("Err in initial auth setup, exiting");
         console.error(error_message);
-        return;
-    }
-
-    // Test our logged-in cookies to make sure we have acces to the api now
-    const success = await test_ikon_token_and_cookies();
-    if (!success)
-    {
-        console.error("Failed validating received cookies and token on /me endpoint");
         return;
     }
 
@@ -61,11 +54,23 @@ async function main() {
         const resortId = parseInt(resortIdStr);
         const resort = resorts.find(x => x.id == resortId);
 
-        // Get ikon reservation data for this specific resort
-        let reservation_info = await get_ikon_reservation_dates(resortIdStr);
+        let reservation_info = await get_ikon_reservation_dates(resortId);
         if (reservation_info.error) {
-            console.error(reservation_info.error_message);
-            return res.status(500);
+            let { error, error_message, data } = await refresh_and_test_auth();
+            if (error) {
+                console.error("Failed refreshing auth after failing reservation dates request:");
+                console.error(reservation_info.error_message + "\n");
+                console.error(error_message);
+                return res.status(500);
+            } else {
+                // Try call again after re authing
+                reservation_info = await get_ikon_reservation_dates(resort_id);
+                if (reservation_info.error) {
+                    console.error("Second error for reservation info even after reauthing");
+                    console.error(reservation_info.error_message);
+                    return res.status(500);
+                }
+            }
         }
         
         // Dates need to be zeroed out otherwise comparison fails

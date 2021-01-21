@@ -8,7 +8,7 @@ const fs = require("fs");
 const { promisify } = require("util");
 
 const { build_resort_list_str, prompt_user_and_wait } = require("./cli");
-const { load_token_and_cookies, test_ikon_token_and_cookies, get_ikon_reservation_dates, get_ikon_resorts } = require("./ikon_proxy");
+const { refresh_and_test_auth, get_ikon_reservation_dates, get_ikon_resorts } = require("./ikon_proxy");
 const { send_confirmation_email } = require("./sendgrid_proxy.js");
 
 if (!process.env.DEPLOY_STAGE || process.env.DEPLOY_STAGE === '') {
@@ -88,8 +88,21 @@ app.post("/save-notification", async (req, res) => {
     // Get ikon reservation data for this specific resort
     let reservation_info = await get_ikon_reservation_dates(resort_id);
     if (reservation_info.error) {
-        console.error(reservation_info.error_message);
-        return res.status(500);
+        let { error, error_message, data } = await refresh_and_test_auth();
+        if (error) {
+            console.error("Failed refreshing auth after failing reservation dates request:");
+            console.error(reservation_info.error_message + "\n");
+            console.error(error_message);
+            return res.status(500);
+        } else {
+            // Try call again after re authing
+            reservation_info = await get_ikon_reservation_dates(resort_id);
+            if (reservation_info.error) {
+                console.error("Second error for reservation info even after reauthing");
+                console.error(reservation_info.error_message);
+                return res.status(500);
+            }
+        }
     }
 
     // Dates need to be zeroed out otherwise comparison fails
@@ -119,7 +132,9 @@ app.post("/save-notification", async (req, res) => {
             await appendFile(data_filename, polling_data);
             response_str = "Reservations are full for your selected date, notification has been saved and you will be notified if a slot opens up. Check email for confirmation.";
             console.log(`Saved notification for ${email}`);
-            await send_confirmation_email(email, resort_id, chosen_date, now);
+
+            const resort = resorts.find(x => x.id == resort_id);
+            await send_confirmation_email(email, resort == undefined ? resort_id_str : resort.name, chosen_date, now);
         } catch (err) {
             response_str = "Reservations are full for your selected date, but there was an internal issue saving your notification preferences. Please try again, or if the problem persists contact me."
             console.error("Error saving to reservation file: ");
@@ -134,27 +149,21 @@ app.post("/save-notification", async (req, res) => {
 
 app.post("/refresh-ikon-auth", async (req, res) => {
     // Get call reservation data function with resort id to force auth refresh
-    let reservation_info = await get_ikon_reservation_dates(1);
-    if (reservation_info.error) {
-        console.error(reservation_info.error_message);
-        return res.status(500);
+    console.log("Starting refresh...");
+    let { error, error_message, data } = await refresh_and_test_auth();
+    if (error) {
+        console.error(error_message);
+        return res.status(500).send();
     }
 
-    return res.status(204);
+    return res.status(204).send();
 });
 
 async function main() {
-    let { error, error_message, data } = await load_token_and_cookies();
+    let { error, error_message, data } = await refresh_and_test_auth();
     if (error) {
+        console.error("Err in initial auth setup, exiting");
         console.error(error_message);
-        return;
-    }
-
-    // Test our logged-in cookies to make sure we have acces to the api now
-    const success = await test_ikon_token_and_cookies();
-    if (!success)
-    {
-        console.error("Failed validating received cookies and token on /me endpoint");
         return;
     }
 

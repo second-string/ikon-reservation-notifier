@@ -22,6 +22,8 @@ async function load_token_and_cookies() {
     if (error) {
         console.error("Error in POST to log in w/ token and cookies");
         console.error(error.message);
+    } else {
+        console.log("Successful POST with login data");
     }
 
     return {
@@ -33,6 +35,7 @@ async function load_token_and_cookies() {
 
 async function test_ikon_token_and_cookies() {
     let success = true;
+    console.log("Testing authed cookies and token");
     try {
         const res = await got("https://account.ikonpass.com/api/v2/me", { cookieJar: cookie_jar, ignoreInvalidCookies: true });
     } catch (err) {
@@ -96,6 +99,33 @@ async function ikon_login(token, cookie_str) {
     };
 }
 
+async function refresh_and_test_auth() {
+    let { error, error_message, data } = await load_token_and_cookies();
+    if (error) {
+        error_message += "\n-------------------";
+        error_message += "\nCall to load_token_and_cookies failed in refresh_and_test_auth";
+    } else {
+        // Test our logged-in cookies to make sure we have acces to the api now
+        const success = await test_ikon_token_and_cookies();
+        if (!success)
+        {
+            error = true;
+            error_message += "\n--------------------";
+            error_message = "\nIn refresh_and_test_auth, first call to load_token_and_cookies successfull but second call to test_ikon_token_and_cookies failed";
+        } else {
+            error = false;
+            error_message = "";
+            data = null;
+        }
+    }
+
+    return {
+        error,
+        error_message,
+        data
+    };
+}
+
 async function get_ikon_reservation_dates(resort_id) {
     const token_instance = got.extend({
         hooks: {
@@ -130,6 +160,7 @@ async function get_ikon_reservation_dates(resort_id) {
     }
 
     // We've most likely be deauthed, reload token/cookies and try again
+    /*
     if (res == undefined || res.statusCode >= 400) {
         console.log("Attemtping to reload token/cookies in middle of notification saving due to expiration...");
         let { error: reload_error, error_message: reload_error_message, data: reload_data } = await load_token_and_cookies();
@@ -156,7 +187,7 @@ async function get_ikon_reservation_dates(resort_id) {
             ({ error, error_message, data } = await get_ikon_reservation_dates(resort_id));
         }
     }
-
+*/
     return {
         error,
         error_message: error ? error_message : null,
@@ -196,8 +227,7 @@ async function get_ikon_resorts() {
 }
 
 module.exports = {
-    load_token_and_cookies,
-    test_ikon_token_and_cookies,
+    refresh_and_test_auth,
     get_ikon_reservation_dates,
     get_ikon_resorts
 };
