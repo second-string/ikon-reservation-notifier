@@ -22,7 +22,7 @@ function set_routes() {
     router.get("/health", (req, res) => res.send("Surviving not thriving"));
 
     router.get("/", (req, res) => {
-        res.render("home");
+        res.render("home", { prod: process.env.DEPLOY_STAGE == "PROD" });
     });
 
     router.get("/resorts", (req, res) => {
@@ -39,7 +39,7 @@ function set_routes() {
                 non_reservation_resorts.push(resort);
             }
         }
-        res.render("resorts", { available_resorts, non_available_resorts, non_reservation_resorts });
+        res.render("resorts", { prod: process.env.DEPLOY_STAGE == "PROD", available_resorts, non_available_resorts, non_reservation_resorts });
     });
 
     router.get("/reservation-dates", (req, res) => {
@@ -51,7 +51,7 @@ function set_routes() {
         const resort_id = parseInt(resort_id_str);
 
         const resort = resorts.filter(x => x.id == resort_id)[0];
-        res.render("reservation-dates", { resort });
+        res.render("reservation-dates", { prod: process.env.DEPLOY_STAGE == "PROD", resort });
     });
 
     router.post("/save-notification", async (req, res) => {
@@ -100,8 +100,7 @@ function set_routes() {
             const d = new Date(x + "Z");
             d.setUTCHours(0, 0, 0, 0);
             return d;
-        });
-        const unavailable_dates = reservation_info.data[0].unavailable_dates.map(x => {
+        }); const unavailable_dates = reservation_info.data[0].unavailable_dates.map(x => {
             const d = new Date(x + "Z");
             d.setUTCHours(0, 0, 0, 0);
             return d;
@@ -134,7 +133,7 @@ function set_routes() {
             response_str = "Reservations available for that date, go to ikonpass.com to reserve. Notification not saved.";
         }
 
-        res.render("notification-status", { status_message: response_str });
+        res.render("notification-status", { prod: process.env.DEPLOY_STAGE == "PROD", status_message: response_str });
     });
 
     router.post("/refresh-ikon-auth", async (req, res) => {
