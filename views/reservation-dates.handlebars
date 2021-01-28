@@ -2,7 +2,7 @@
 <form style="display: flex; flex-direction: column; align-items: center; justify-content: center;" action="/save-notification" method="POST">
     <p style="margin-bottom: 0;">Select a date to monitor for open reservations at {{resort.name}}:</p>
     <p style="margin-top: 0;"><small>(If your browser doesn't show a datepicker, enter date in format YYY-MM-dd)</small></p>
-    <input type="date" id="reservation-date" name="reservation-date"  placeholder="YYY-MM-dd"i />
+    <input type="date" id="reservation-date" name="reservation-date"  placeholder="YYYY-MM-dd"i />
     <p>Enter the email address you wish to receive an email at if a reservation spot opens up:</p>
     <input type="email"id="email" name="email" placeholder="you@test.com" />
     <input type="hidden" id="resort-id" name="resort-id" value="{{resort.id}}" />
