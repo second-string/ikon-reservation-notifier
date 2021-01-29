@@ -14,8 +14,9 @@ start_ikon_reservation_notifier.sh
 # self-signed certs for localhost ssl
 *.pem
 
-# cron output
+# cron output & backups
 cron_output.txt
+output_backups/
 
 # Logs
 logs
