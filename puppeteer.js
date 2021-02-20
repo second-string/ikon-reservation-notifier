@@ -19,8 +19,19 @@ async function load_puppeteer_page(url) {
     if (process.env.DEV_ENV != "PROD") {
         await page.setDefaultNavigationTimeout(0); 
     }
-    await page.goto(url);
+
+    let prom = new Promise((res, rej) => {
+        page.on('domcontentloaded', async (response) => {
+            res();
+        });
+    })
+
+    await page.goto(url, { waitUntil: 'networkidle2' });
     console.log("Sent first page request, waiting for login elements after redirects");
+    await page.waitForTimeout(3000);
+    await prom;
+    const html = await page.content();
+    console.log(html);
     await page.waitForSelector(".amp-sign-in-form.login-form", { timeout: 0 });
     console.log("Successfully loaded login page with login form accessible");
 
