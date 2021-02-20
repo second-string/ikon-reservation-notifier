@@ -13,10 +13,16 @@ async function load_puppeteer_page(url) {
     const browser = await puppeteer.launch(opts);
     const page = await browser.newPage();
 
+    // set user agent (override the default headless User Agent)
+    await page.setUserAgent('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.108 Safari/537.36');
+
     if (process.env.DEV_ENV != "PROD") {
         await page.setDefaultNavigationTimeout(0); 
     }
     await page.goto(url);
+    console.log("Sent first page request, waiting for login elements after redirects");
+    await page.waitForSelector(".amp-sign-in-form.login-form", { timeout: 0 });
+    console.log("Successfully loaded login page with login form accessible");
 
     return {
         browser,
